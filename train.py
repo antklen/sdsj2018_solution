@@ -4,6 +4,7 @@ import pickle
 import time
 import pandas as pd
 import gc
+from sklearn.externals import joblib
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -11,20 +12,21 @@ warnings.filterwarnings("ignore")
 from preprocess import preprocess
 from feature_selection import lgb_importance_fs
 from optim_hyperopt import run_hyperopt
-from models import lgb_model, xgb_model
 from small_data import train_small_data
-from sklearn.externals import joblib
+
 
 # use this to stop the algorithm before time limit exceeds
 TIME_LIMIT = int(os.environ.get('TIME_LIMIT', 5*60))
+# definitions of special cases of big and small datasets
 BIG_DATASET_SIZE = 300 * 1024 * 1024
 SMALL_DATA_LEN = 1000
-
 # hyperopt settings
 HYPEROPT_NUM_ITERATIONS = 30
 HYPEROPT_MAX_TRAIN_SIZE = 300 * 1024 * 1024
 HYPEROPT_MAX_TRAIN_ROWS = 5e+6
+# mean target encoding for categorical variables
 USE_MEAN_TARGET = True
+
 
 if __name__ == '__main__':
 
@@ -36,7 +38,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     start_time = time.time()
-
 
     # read small amount of data to parse dtypes and find datetime columns
     df0 = pd.read_csv(args.train_csv, nrows=5000)
@@ -62,9 +63,7 @@ if __name__ == '__main__':
     model_config['dtypes'] = dtypes
     model_config['datetime_cols'] = datetime_cols
     model_config['mean_target'] = USE_MEAN_TARGET
-
     model_config['positive_target'] = True if y.min() >= 0 else False
-
 
     # preprocessing
     if is_big or is_small or not USE_MEAN_TARGET:
@@ -86,14 +85,19 @@ if __name__ == '__main__':
     # final data shape
     print('final df shape {}'.format(df.shape))
 
-    if model_config['is_small']:
+    if is_small:
 
+        # handling small dataset - just averaging bunch of random models
+        # without parameter optimization
         elapsed = time.time()-start_time
         df.fillna(-1, inplace=True)
         models = train_small_data(df, y, model_config,
                                     time_limit=int((TIME_LIMIT-elapsed)*0.7),
                                     include_algos=['et', 'rf', 'xgb', 'lgb'],
                                     model_seed=42)
+
+        # save models to files
+        # need to check if disk space limit is exceeded
         path = os.path.join(args.model_dir, 'models')
         if not os.path.exists(path):
             os.mkdir(path)
@@ -113,7 +117,7 @@ if __name__ == '__main__':
 
         # hyperopt
         elapsed = time.time()-start_time
-        model_type = 'lgb'# if not is_small else 'rf'
+        model_type = 'lgb'
         params, models, w = run_hyperopt(df, y, model_config,
                               N=HYPEROPT_NUM_ITERATIONS,
                               time_limit=int((TIME_LIMIT-elapsed)*0.9),
@@ -123,7 +127,6 @@ if __name__ == '__main__':
 
         model_config['models'] = models
         model_config['model_weights'] = w
-
 
     # save config to file
     model_config_filename = os.path.join(args.model_dir, 'model_config.pkl')

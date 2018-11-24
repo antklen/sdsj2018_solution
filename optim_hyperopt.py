@@ -1,16 +1,15 @@
-import pandas as pd
 import numpy as np
 import time
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.metrics import mean_squared_error, roc_auc_score
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
-from functools import partial
 
 from models import lgb_model, xgb_model, rf_model
 from ensemble import stepwise_blend
 from utils import rmse
 
 
+# feature spaces for algorithms to sample from
 fspace_lgb = {
     'num_leaves': hp.quniform('num_leaves', 10, 100, 1),
     'subsample': hp.uniform('subsample', 0.6, 1),
@@ -33,16 +32,18 @@ fspace_rf = {
 }
 
 
-
-def run_hyperopt(X, y, model_config, N, time_limit, model_type='lgb', return_preds=False,
-                 blend=False, max_train_size=None, max_train_rows=None):
-    """hyperparameters optimization with hyperopt"""
+def run_hyperopt(X, y, model_config, N, time_limit, model_type='lgb',
+                 return_preds=False, blend=False,
+                 max_train_size=None, max_train_rows=None):
 
     print('hyperopt..')
 
     start_time = time.time()
 
     mode = model_config['mode']
+
+    # make cross-validation instead of single train-validation split for small dataset
+    # actually wasn't used in final submission
     cv = True if X.shape[0] < 2000 else False
 
     # train-test split
@@ -57,11 +58,6 @@ def run_hyperopt(X, y, model_config, N, time_limit, model_type='lgb', return_pre
     Xtrain, Xtest, ytrain, ytest = train_test_split(X, y, train_size=train_size, random_state=42)
     print('train shape {}, size {}'.format(Xtrain.shape, Xtrain.memory_usage(deep=True).sum()/1024/1024))
 
-    if blend or return_preds:
-        models = []
-        preds = []
-        scores = []
-
     # define search space
     if model_type == 'lgb':
         fspace = fspace_lgb
@@ -69,6 +65,11 @@ def run_hyperopt(X, y, model_config, N, time_limit, model_type='lgb', return_pre
         fspace = fspace_xgb
     elif model_type == 'rf':
         fspace = fspace_rf
+
+    if blend or return_preds:
+        models = []
+        preds = []
+        scores = []
 
     # objective function to pass to hyperopt
     def objective(params):
@@ -99,7 +100,6 @@ def run_hyperopt(X, y, model_config, N, time_limit, model_type='lgb', return_pre
 
             for i, (train_index, test_index) in enumerate(kf.split(X)):
 
-
                 # train-validation split
                 Xtrain2 = X.iloc[train_index]
                 Xtest2 = X.iloc[test_index]
@@ -107,7 +107,6 @@ def run_hyperopt(X, y, model_config, N, time_limit, model_type='lgb', return_pre
                 ytest2 = y.iloc[test_index]
 
                 model.fit(Xtrain2, ytrain2)
-
                 if mode == 'regression':
                     pred[test_index] = model.predict(Xtest2)
                 elif mode == 'classification':
@@ -123,7 +122,6 @@ def run_hyperopt(X, y, model_config, N, time_limit, model_type='lgb', return_pre
         else:
 
             model.fit(Xtrain, ytrain)
-
             if mode == 'regression':
                 pred = model.predict(Xtest)
                 loss = np.sqrt(mean_squared_error(ytest, pred))
@@ -160,10 +158,10 @@ def run_hyperopt(X, y, model_config, N, time_limit, model_type='lgb', return_pre
 
     print('best parameters', trials.best_trial['result']['params'])
 
+
     if blend:
 
         print('blending..')
-
         y_blend = y if cv else ytest
 
         num_best_models = 5

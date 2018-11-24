@@ -4,7 +4,6 @@ from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import KFold
 
 
-
 def transform_datetime_features(df, holidays_file='holidays.csv'):
     """extract datetime features"""
 
@@ -119,8 +118,13 @@ def compute_likelihood(train_fold, test_fold, feature, target, global_bias=30):
 
     return test_fold[feature].map(lambda x: values.get(x, global_avg)).values
 
-def likelihood_encoding(df, cat_cols, target='target', categorical_values=None, global_avg=None, global_bias=30, n_folds=5, drop_original=False):
 
+def likelihood_encoding(df, cat_cols, target='target', categorical_values=None,
+                        global_avg=None, global_bias=30, n_folds=5, drop_original=False):
+
+    """likelihood (mean target) encoding"""
+
+    # train stage
     if categorical_values is None:
 
         categorical_values = {}
@@ -133,7 +137,8 @@ def likelihood_encoding(df, cat_cols, target='target', categorical_values=None, 
             for train_index, test_index in kf.split(df):
                 train_fold = df[[feature, target]].iloc[train_index, :]
                 test_fold = df[[feature]].iloc[test_index, :]
-                likelihood.iloc[test_index] = compute_likelihood(train_fold, test_fold, feature, target, global_bias)
+                likelihood.iloc[test_index] = compute_likelihood(train_fold,
+                    test_fold, feature, target, global_bias)
 
             if drop_original:
                 df[feature] = likelihood
@@ -148,6 +153,7 @@ def likelihood_encoding(df, cat_cols, target='target', categorical_values=None, 
 
         return df, categorical_values, global_avg
 
+    # test stage
     else:
 
         for col_name in list(df.columns):

@@ -4,6 +4,8 @@ from hyperopt import hp
 from hyperopt.pyll import stochastic
 from models import lgb_model, xgb_model, rf_model, et_model
 
+
+# feature spaces for algorithms to sample from
 fspace_lgb = {
     'num_leaves': hp.quniform('num_leaves', 5, 50, 1),
     'subsample': hp.uniform('subsample', 0.6, 1),
@@ -11,7 +13,6 @@ fspace_lgb = {
     'min_child_samples': hp.quniform('min_child_samples', 10, 30, 1),
     'learning_rate': hp.loguniform('learning_rate', np.log(0.02), np.log(0.2))
 }
-
 fspace_xgb = {
     'max_depth': 3 + hp.randint('max_depth', 6),
     'subsample': hp.uniform('subsample', 0.6, 1),
@@ -25,12 +26,17 @@ def train_small_data(df, y, model_config, time_limit,
                      include_algos=['et', 'rf', 'lgb', 'xgb'], n_boost=10,
                      model_seed=None, verbose=False):
 
+    """
+    training for very small data:
+    run several random models, then average them
+    """
+
     start_time = time.time()
     mode = model_config['mode']
-    n_boost = 10
     models = []
 
     if 'et' in include_algos:
+
         for max_f in [0.2,0.3,0.4,0.5,0.6,0.7,0.8]:
             params = {'n_estimators': 500, 'max_depth': 20, 'max_features': max_f,
                       'n_jobs': -1, 'random_state': model_seed}
@@ -45,6 +51,7 @@ def train_small_data(df, y, model_config, time_limit,
         print('et done. total time elapsed {}'.format(time.time()-start_time))
 
     if 'xgb' in include_algos:
+
         space = [stochastic.sample(fspace_xgb) for i in range(n_boost)]
         for params in space:
             params.update({'n_estimators': 500, 'random_state': model_seed, 'n_jobs': -1})
@@ -59,6 +66,7 @@ def train_small_data(df, y, model_config, time_limit,
         print('xgb done. total time elapsed {}'.format(time.time()-start_time))
 
     if 'lgb' in include_algos:
+
         space = [stochastic.sample(fspace_lgb) for i in range(n_boost)]
         for params in space:
             params['num_leaves'] = int(params['num_leaves'])
@@ -75,6 +83,7 @@ def train_small_data(df, y, model_config, time_limit,
         print('lgb done. total time elapsed {}'.format(time.time()-start_time))
 
     if 'rf' in include_algos:
+
         for max_f in [0.2,0.3,0.4,0.5,0.6,0.7,0.8]:
             params = {'n_estimators': 500, 'max_depth': 20, 'max_features': max_f,
                       'n_jobs': -1, 'random_state': model_seed}
@@ -87,6 +96,5 @@ def train_small_data(df, y, model_config, time_limit,
                 print('time limit exceeded.')
                 return models
         print('rf done. total time elapsed {}'.format(time.time()-start_time))
-
 
     return models

@@ -14,6 +14,7 @@ from preprocess import preprocess
 # use this to stop the algorithm before time limit exceeds
 TIME_LIMIT = int(os.environ.get('TIME_LIMIT', 5*60))
 
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -51,7 +52,6 @@ if __name__ == '__main__':
 
         df.fillna(-1, inplace=True)
         model_files = os.listdir(model_config['model_path'])
-        print(model_files)
         pred = []
         for i, f in enumerate(model_files):
             model = joblib.load(os.path.join(model_config['model_path'], f))
@@ -78,7 +78,6 @@ if __name__ == '__main__':
         pred[pred<0] = 0
 
     df_pred['prediction'] = pred
-
     df_pred[['line_id', 'prediction']].to_csv(args.prediction_csv, index=False)
 
     print('Prediction time: {}'.format(time.time() - start_time))
