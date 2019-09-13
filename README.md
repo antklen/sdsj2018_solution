@@ -1,6 +1,6 @@
 # Sberbank Data Science Journey 2018: AutoML
 
-2nd place solution for [Sberbank Data Science Journey 2018 AutoML competition](https://sdsj.sberbank.ai/ru/contest)
+2nd place solution for [Sberbank Data Science Journey 2018 AutoML competition](https://sdsj.sberbank.ai/2018/ru/contest.html)
 
 main scripts:  
 train.py - training <br/>
